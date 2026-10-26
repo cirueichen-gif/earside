@@ -35,6 +35,16 @@
 | `barge_in` | true | bool | 她講話時你出聲就打斷 | **喇叭模式建議 false**（她會聽到自己，自己打斷自己） |
 | `echo_guard_s` | 0.4 | 秒 | 她講完後多留的尾巴，用來丟掉自己的回音 | 她回自己的話→加大；正常接話被吞→減小 |
 
+## 哨兵（sentinel）
+
+| 參數 | 預設 | 單位 | 改了會怎樣 | 什麼時候調 |
+|---|---|---|---|---|
+| `sentinel.enabled` | true | bool | 總開關；false＝完全不看螢幕（`watch` 直接跳過） | 不想被看、或只想用聽／說 |
+| `sentinel.sensitivity` | 1.0 | 0.25–4.0 | 越高越容易觸發（門檻變寬鬆） | 造型／特效一直誤報→調低；該報不報→調高 |
+
+preset 也可以有自己的 `enabled`、`sensitivity`、`game_type`；單一區域的 `rule.sensitivity` 再覆蓋一次。
+**RTS 這類 UI 動畫多的遊戲，建議 0.5–0.8**；FPS 可以 1.0 上下。先跑 `watch` 乾跑看事件量再調。
+
 ## 已知的坑
 
 - **SAPI 不能用在 talk／chat**：pyttsx3 的訊息幫浦跟串流執行緒會卡死；`builtin` 只留給 `say`。

@@ -12,6 +12,20 @@ import numpy as np
 from earside.eyes.preset import Preset, Region
 
 
+def _clamp_sens(value: float) -> float:
+    return max(0.25, min(4.0, float(value)))
+
+
+def _easier_upper(base: float, sens: float) -> float:
+    """門檻越接近 1 越容易觸發（luma/sat 的比值）。"""
+    return max(0.0, min(1.0, 1.0 - (1.0 - float(base)) / _clamp_sens(sens)))
+
+
+def _easier_lower(base: float, sens: float) -> float:
+    """門檻越低越容易觸發（diff/min_ratio/template）。"""
+    return max(0.0, min(1.0, float(base) / _clamp_sens(sens)))
+
+
 class RegionState:
     """State tracking for a single region (history deque for temporal smoothing and baseline)."""
 
@@ -42,8 +56,11 @@ class RegionState:
 class RuleEngine:
     """Evaluates regions against configured sentinel rules with temporal filtering."""
 
-    def __init__(self, preset: Preset):
+    def __init__(self, preset: Preset, sensitivity: float | None = None):
         self.preset = preset
+        self.base_sensitivity = _clamp_sens(
+            sensitivity if sensitivity is not None else getattr(preset, "sensitivity", 1.0)
+        )
         self.states: Dict[str, RegionState] = {
             r.name: RegionState(r, preset.base_dir) for r in preset.regions
         }
@@ -138,9 +155,10 @@ class RuleEngine:
     ) -> Dict[str, Any]:
         """Calculates L_target / L_bg ratio R and saturation S, compares against sliding median baseline R0, S0."""
         rule = state.region.rule
+        sens = _clamp_sens(rule.get("sensitivity", self.base_sensitivity))
         bg_ring_ratio = float(rule.get("bg_ring", 0.05))
-        luma_ratio_thresh = float(rule.get("luma_ratio", 0.6))
-        sat_ratio_thresh = float(rule.get("sat_ratio", 0.5))
+        luma_ratio_thresh = _easier_upper(rule.get("luma_ratio", 0.6), sens)
+        sat_ratio_thresh = _easier_upper(rule.get("sat_ratio", 0.5), sens)
 
         h, w = frame_bgr.shape[:2]
         ring_px_x = max(1, int(round(w * bg_ring_ratio)))
@@ -243,7 +261,8 @@ class RuleEngine:
         """HSV range pixel ratio >= min_ratio."""
         rule = state.region.rule
         hsv_range = rule.get("hsv")
-        min_ratio = float(rule.get("min_ratio", 0.1))
+        sens = _clamp_sens(rule.get("sensitivity", self.base_sensitivity))
+        min_ratio = _easier_lower(rule.get("min_ratio", 0.1), sens)
 
         if not hsv_range or len(hsv_range) != 6:
             raise ValueError(
@@ -286,10 +305,13 @@ class RuleEngine:
         """HSV mask -> cv2.connectedComponentsWithStats -> count blobs in area range and center_near."""
         rule = state.region.rule
         hsv_range = rule.get("hsv")
+        sens = _clamp_sens(rule.get("sensitivity", self.base_sensitivity))
         min_area = int(rule.get("min_area_px", 1))
         max_area = int(rule.get("max_area_px", 1000000))
         center_near = rule.get("center_near")
-        min_count = int(rule.get("min_count", 1))  # Default 1 blob to trigger
+        min_count = max(
+            1, int(round(int(rule.get("min_count", 1)) / sens))
+        )  # 靈敏度高→需要的 blob 數變少
 
         if not hsv_range or len(hsv_range) != 6:
             raise ValueError(
@@ -357,7 +379,8 @@ class RuleEngine:
         """cv2.matchTemplate max_val >= threshold."""
         rule = state.region.rule
         template_rel_path = rule.get("template")
-        threshold = float(rule.get("threshold", 0.8))
+        sens = _clamp_sens(rule.get("sensitivity", self.base_sensitivity))
+        threshold = _easier_lower(rule.get("threshold", 0.8), sens)
 
         if not template_rel_path:
             raise ValueError("Rule 'template' missing 'template' path")
@@ -411,8 +434,9 @@ class RuleEngine:
     def _eval_change(self, state: RegionState, frame_bgr: np.ndarray) -> Dict[str, Any]:
         """Difference pixel ratio compared to previous frame >= diff_ratio."""
         rule = state.region.rule
-        diff_ratio_thresh = float(rule.get("diff_ratio", 0.08))
-        diff_threshold = int(rule.get("diff_threshold", 25))  # pixel value delta to count as changed
+        sens = _clamp_sens(rule.get("sensitivity", self.base_sensitivity))
+        diff_ratio_thresh = _easier_lower(rule.get("diff_ratio", 0.08), sens)
+        diff_threshold = int(rule.get("diff_threshold", 25))
 
         # Small scale for fast diff calculation
         gray = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2GRAY)

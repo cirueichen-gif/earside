@@ -10,7 +10,7 @@ Windows 桌面陪玩引擎：用「區域」看螢幕、用「端口」接耳朵
 - **聽**：麥克風 → Silero VAD（512@16k、soxr 抗混疊）→ ASR 端口
 - **說**：LLM 串流 → 斷句 → TTS 端口 →（可選）換嗓 → 播放＋字幕
 - **寫**：置頂、滑鼠穿透、per-monitor DPI aware 的字幕條
-- **讀**：mss 擷取視窗 → preset 區域 → 哨兵規則（相對亮度比、顏色、blob、模板、變化；OCR 佔位）
+- **讀**：mss 擷取視窗 → preset 區域 → 哨兵規則（相對亮度比、顏色、blob、模板、變化；OCR 佔位）。有總開關與靈敏度，RTS／FPS 各自調。
 - **一直聽**：`chat`（VAD onset 打斷、echo guard、短句合併）
 - **可調參數**：`[tuning]`，見 [docs/TUNING.md](docs/TUNING.md)
 

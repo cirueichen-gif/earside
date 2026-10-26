@@ -36,6 +36,11 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     ok = True
 
     print(f"config        ok    {config_path or '預設值（沒有 config.toml）'}")
+    sentinel = cfg.get("sentinel", {})
+    print(
+        f"sentinel      ok    enabled={sentinel.get('enabled', True)} "
+        f"sensitivity={sentinel.get('sensitivity', 1.0)}"
+    )
     t = cfg["tuning"]
     print(
         "tuning        ok    "
@@ -399,7 +404,13 @@ def cmd_watch(args: argparse.Namespace) -> int:
     from .eyes.rules import RuleEngine
 
     cfg = load_config(args.config)
+    if not cfg.get("sentinel", {}).get("enabled", True):
+        print("哨兵已關閉（config.toml [sentinel] enabled=false）", file=sys.stderr)
+        return 0
     preset = load_preset(args.preset or cfg["app"]["preset"])
+    if not preset.enabled:
+        print(f"preset '{preset.id}' 已關閉（enabled=false）", file=sys.stderr)
+        return 0
     regex = args.window or preset.match.get("window_title_regex")
     if not regex:
         print("preset 沒有 window_title_regex，請用 --window 指定", file=sys.stderr)
@@ -408,7 +419,12 @@ def cmd_watch(args: argparse.Namespace) -> int:
     capture = CaptureSession(
         regex, backend=str(cfg.get("capture", {}).get("backend", "auto"))
     )
-    engine = RuleEngine(preset)
+    sensitivity = (
+        args.sensitivity
+        if args.sensitivity is not None
+        else float(cfg["sentinel"].get("sensitivity", 1.0))
+    )
+    engine = RuleEngine(preset, sensitivity=sensitivity)
     states = {region.name: False for region in preset.regions}
     due = {region.name: 0.0 for region in preset.regions}
     save_dir = Path(args.save) if args.save else None
@@ -505,6 +521,7 @@ def build_parser() -> argparse.ArgumentParser:
     watch.add_argument("--window", default=None, help="覆蓋 preset 的視窗標題 regex")
     watch.add_argument("--seconds", type=float, default=0.0, help="跑幾秒（0=一直跑）")
     watch.add_argument("--save", default=None, help="把每個區域第一幀存成 png")
+    watch.add_argument("--sensitivity", type=float, default=None, help="0.5–2.0；越高越敏感")
     watch.set_defaults(func=cmd_watch)
     return parser
 

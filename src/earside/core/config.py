@@ -16,6 +16,12 @@ DEFAULTS: dict[str, Any] = {
         "preset": "presets/general.json",
     },
     "capture": {"backend": "auto"},
+    "sentinel": {
+        # 整體開關：不想讓它看螢幕就關掉（watch／之後的主動觸發都不跑）
+        "enabled": True,
+        # 越高越敏感（越容易觸發）；0.5＝遲鈍、2.0＝很敏感
+        "sensitivity": 1.0,
+    },
     "tuning": {
         # 耳朵
         "vad_threshold": 0.5,

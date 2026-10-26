@@ -1,0 +1,30 @@
+{
+  "id": "example-rts",
+  "name": "RTS 範例（請自己改視窗標題與座標）",
+  "game_type": "rts",
+  "enabled": true,
+  "sensitivity": 0.8,
+  "match": { "window_title_regex": "(?i)ExampleRTS" },
+  "reference_aspect": 1.6,
+  "regions": [
+    {
+      "name": "resource_bar",
+      "rect": [0.0, 0.0, 0.35, 0.05],
+      "interval_ms": 700,
+      "rule": { "type": "color_ratio", "hsv": [15, 35, 120, 255, 120, 255], "min_ratio": 0.02 }
+    },
+    {
+      "name": "minimap",
+      "rect": [0.78, 0.02, 0.2, 0.22],
+      "interval_ms": 500,
+      "rule": { "type": "change", "diff_ratio": 0.05, "consecutive": 2 }
+    },
+    {
+      "name": "selection_panel",
+      "rect": [0.01, 0.76, 0.24, 0.22],
+      "interval_ms": 700,
+      "rule": { "type": "change", "diff_ratio": 0.06, "consecutive": 2 }
+    }
+  ],
+  "triggers": []
+}

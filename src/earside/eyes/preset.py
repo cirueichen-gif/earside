@@ -26,6 +26,9 @@ class Preset:
     triggers: List[Dict[str, Any]] = field(default_factory=list)
     vision: Dict[str, Any] = field(default_factory=dict)
     base_dir: Optional[Path] = None
+    game_type: str = "generic"
+    enabled: bool = True
+    sensitivity: float = 1.0
 
 
 def load_preset(path: Union[str, Path]) -> Preset:
@@ -134,6 +137,22 @@ def load_preset(path: Union[str, Path]) -> Preset:
     if not isinstance(vision, dict):
         raise ValueError("Field 'vision' must be an object")
 
+    game_type = data.get("game_type", "generic")
+    if not isinstance(game_type, str):
+        raise ValueError("Field 'game_type' must be a string")
+
+    enabled = data.get("enabled", True)
+    if not isinstance(enabled, bool):
+        raise ValueError("Field 'enabled' must be a boolean")
+
+    sensitivity = data.get("sensitivity", 1.0)
+    try:
+        sensitivity = float(sensitivity)
+    except (TypeError, ValueError):
+        raise ValueError("Field 'sensitivity' must be a number")
+    if not (0.25 <= sensitivity <= 4.0):
+        raise ValueError("Field 'sensitivity' must be between 0.25 and 4.0")
+
     return Preset(
         id=data["id"],
         name=data["name"],
@@ -143,4 +162,7 @@ def load_preset(path: Union[str, Path]) -> Preset:
         triggers=triggers,
         vision=vision,
         base_dir=p.parent.resolve(),
+        game_type=game_type,
+        enabled=enabled,
+        sensitivity=sensitivity,
     )

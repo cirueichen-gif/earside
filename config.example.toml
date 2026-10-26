@@ -9,6 +9,12 @@ preset = "presets/general.json"
 [capture]
 backend = "auto"          # auto = mss（WGC 還沒實作）
 
+[sentinel]
+# 哨兵總開關：不想讓它看螢幕就設 false（watch 直接不跑）。
+enabled = true
+# 靈敏度：越高越容易觸發（造型、特效容易誤判時往 0.5 調）；0.5–2.0。
+sensitivity = 1.0
+
 [tuning]
 # 起句門檻（0–1）。太高→小聲漏掉；太低→雜音當人聲。
 vad_threshold = 0.5
