@@ -11,6 +11,7 @@ datas = [
     (str(project_dir / "personas"), "personas"),
     (str(project_dir / "presets"), "presets"),
     (str(project_dir / "config.example.toml"), "."),
+    (str(project_dir / "models"), "models"),
 ]
 
 # 動態載入或可選依賴所需的 hiddenimports
@@ -42,7 +43,7 @@ excludes = [
 ]
 
 a = Analysis(
-    [str(project_dir / "src" / "earside" / "__main__.py")],
+    [str(project_dir / "launcher.py")],
     pathex=[str(project_dir / "src")],
     binaries=[],
     datas=datas,
@@ -62,6 +63,24 @@ pyz = PYZ(
     a.zipped_data,
     cipher=block_cipher,
 )
+
+# 只留 CPU onnxruntime：砍 CUDA/TensorRT 的 DLL，dist 才不會 1.8GB。
+_CUDA = (
+    "onnxruntime_providers_cuda",
+    "onnxruntime_providers_tensorrt",
+    "cublas",
+    "cudnn",
+    "cufft",
+    "curand",
+    "cusolver",
+    "cusparse",
+    "nvrtc",
+    "nvapi",
+    "tensorrt",
+)
+a.binaries = [
+    item for item in a.binaries if not any(p in item[0].lower() for p in _CUDA)
+]
 
 exe = EXE(
     pyz,

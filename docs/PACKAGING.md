@@ -32,6 +32,15 @@ powershell -ExecutionPolicy Bypass -File scripts/build.ps1 -SkipTests
 產物將輸出至：
 `dist/earside/`（onedir 模式，主執行檔為 `dist/earside/earside.exe`）。
 
+### 實測（2026-10-27）
+- PyInstaller 6.22.3、Python 3.12，建置約 50 秒。
+- **`dist` 214 MB**（spec 砍掉 CUDA/TensorRT DLL；沒砍的話 1.8 GB）。
+- `earside.exe doctor` 全綠（asr／llm skip），`say "測試"` 正常出聲＋字幕。
+- 冷凍環境沒有 torch：VAD 自動走 `models/silero_vad.onnx`（onnxruntime CPU，273 ms）。
+- 入口用 `launcher.py` 絕對 import；直接拿 `src/earside/__main__.py` 當 entry 會相對 import 失敗。
+- exe 預設載入 `_internal/config.example.toml`（SAPI）。要聊天／接自己的端口，用
+  `earside.exe --config <你的 config.toml> chat`，或把 config 放進 `_internal/`。
+
 ---
 
 ## 2. 體積預期與排除策略

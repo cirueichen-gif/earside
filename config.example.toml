@@ -58,8 +58,9 @@ url = "http://127.0.0.1:8802/stt"
 [ports.tts]
 # http：edge-tts 轉接器（建議，talk 用這個）
 # builtin：Windows SAPI，只建議給 `say`；跟串流一起跑會卡（pyttsx3 的已知毛病）
-kind = "http"
-url = "http://127.0.0.1:8803/tts"
+kind = "builtin"
+# kind = "http"
+# url = "http://127.0.0.1:8803/tts"
 
 [ports.llm]
 kind = "http"

@@ -26,22 +26,65 @@ HANGOVER_FRAMES = int(round(HANGOVER_S / FRAME_S))
 MAX_FRAMES = int(round(MAX_UTTER_S / FRAME_S))
 
 
-class SileroVAD:
-    def __init__(self) -> None:
-        from silero_vad import load_silero_vad
+class _OnnxVAD:
+    """沒有 torch 的環境（冷凍 exe）用 onnxruntime 跑同一個 Silero 模型。"""
 
-        try:
-            self.model = load_silero_vad(onnx=True)
-        except Exception:  # noqa: BLE001 - 沒 ONNX 就退回 JIT
-            self.model = load_silero_vad()
+    def __init__(self) -> None:
+        import onnxruntime as ort
+
+        from ..core.paths import project_root
+
+        model = project_root() / "models" / "silero_vad.onnx"
+        if not model.is_file():
+            raise RuntimeError(f"找不到 VAD 模型：{model}")
+        self.sess = ort.InferenceSession(
+            str(model), providers=["CPUExecutionProvider"]
+        )
+        self.reset()
+
+    def reset(self) -> None:
+        self.state = np.zeros((2, 1, 128), dtype=np.float32)
 
     def prob(self, frame: np.ndarray) -> float:
+        x = np.asarray(frame, dtype=np.float32).reshape(1, -1)
+        out, state = self.sess.run(
+            None,
+            {
+                "input": x,
+                "state": self.state,
+                "sr": np.array(16000, dtype=np.int64),
+            },
+        )
+        self.state = np.asarray(state, dtype=np.float32)
+        return float(out[0][0])
+
+
+class SileroVAD:
+    def __init__(self) -> None:
+        self._onnx = None
+        try:
+            from silero_vad import load_silero_vad
+
+            try:
+                self.model = load_silero_vad(onnx=True)
+            except Exception:  # noqa: BLE001 - 沒 ONNX 就退回 JIT
+                self.model = load_silero_vad()
+        except Exception:  # noqa: BLE001 - 冷凍 exe 沒有 torch：走 ONNX
+            self.model = None
+            self._onnx = _OnnxVAD()
+
+    def prob(self, frame: np.ndarray) -> float:
+        if self._onnx is not None:
+            return self._onnx.prob(frame)
         import torch
 
         return float(self.model(torch.from_numpy(frame), SR))
 
     def reset(self) -> None:
-        self.model.reset_states()
+        if self._onnx is not None:
+            self._onnx.reset()
+        else:
+            self.model.reset_states()
 
 
 def iter_utterances(

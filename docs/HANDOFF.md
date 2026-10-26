@@ -7,10 +7,10 @@
 
 - 2026-10-26：P1a–P1d、P2 的讀（擷取／preset／規則／watch）、sentinel 開關與靈敏度完成。
 - 2026-10-27：P2 收尾（哨兵 runner、觸發器、校準 CLI）、P3（合圖／預算／Eye、主動／戰鬥、vision 接事件、短句庫）、P4 打包腳本與 CI。
-- **MVP 完成、可交接**：73 個測試（4 個 capture 預設 skip）。
-- 未完成（不是架構問題，是環境／需求）：真實 vision 端口沒實跑（要金鑰）、exe 沒實建（本機 SAC）、校準 UI 只做過開啟/關閉 smoke。
+- **MVP 完成、可交接**：73 個測試（4 個 capture 預設 skip）；**exe 已實建 214 MB**（`dist/earside/earside.exe`，doctor 全綠、`say` 正常）。
+- 未完成（不是架構問題，是環境／需求）：真實 vision 端口沒實跑（要金鑰）、exe 的 chat 還沒接真 adapters 實跑、校準 UI 只做過開啟/關閉 smoke。
 - **GitHub 未推**（魚片交代等他叫）；本機變更已 commit 在 main。
-- 下一段：拿真遊戲 preset 校準、接 vision 端口、找沒 SAC 的機器建 exe。
+- 下一段：拿真遊戲 preset 校準、接 vision 端口、用 exe 跑一次完整 chat。
 
 > 註：第一次公開上傳時把早期 commit 壓成一個 Initial，所以 P1a–P2 在 git 歷史裡看不出分段。之後每小塊一個 commit。
 
@@ -269,13 +269,15 @@
 - `earside.spec`（PyInstaller onedir）、`scripts/build.ps1`、`.github/workflows/ci.yml`、`docs/PACKAGING.md`。
 
 **怎麼驗**
-- spec 語法檢查、CI YAML 檢查；**exe 沒在本機實建**（Smart App Control 會擋未簽章 exe）。
+- spec 語法檢查、CI YAML 檢查。
+- **已實建**：`dist/earside/earside.exe` 214 MB；`doctor` 全綠、`say` 2.07 秒正常；VAD 在冷凍環境走 ONNX（273 ms）。
 
 **已知缺口**
-- 沒跑 `pyinstaller` 實際打包；CI 也沒在 GitHub 上跑過（今晚不推）。
+- exe 的 `chat` 還沒用真 adapters 實跑（需要你起四個端口）。
+- CI 還沒在 GitHub 上跑過（今晚不推）。
 - 模型（ASR／RVC）不進 exe，文件已寫。
 
-**下一步**：找一臺沒 SAC 的機器或 CI artifact 實建。
+**下一步**：用 exe 跑一次完整 chat。
 
 ---
 
