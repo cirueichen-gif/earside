@@ -11,7 +11,9 @@ Windows 桌面陪玩引擎：用「區域」看螢幕、用「端口」接耳朵
 - **說**：LLM 串流 → 斷句 → TTS 端口 →（可選）換嗓 → 播放＋字幕
 - **寫**：置頂、滑鼠穿透、per-monitor DPI aware 的字幕條
 - **讀**：mss 擷取視窗 → preset 區域 → 哨兵規則（相對亮度比、顏色、blob、模板、變化；OCR 佔位）。有總開關與靈敏度，RTS／FPS 各自調。
-- **一直聽**：`chat`（VAD onset 打斷、echo guard、短句合併）
+- **校準精靈**：Tk 拖框→命名→選規則→存 preset（CLI 子命令還沒接）
+- **眼睛（起頭）**：合圖＋每分／每小時預算＋`Eye`；`chat` 的觸發器帶 `vision: true` 時會看一眼再講
+- **一直聽**：`chat`（VAD onset 打斷、echo guard、短句合併、沉默找話、戰鬥模式）
 - **可調參數**：`[tuning]`，見 [docs/TUNING.md](docs/TUNING.md)
 
 ## 安裝
@@ -32,6 +34,13 @@ python -m earside say "你好"                       # Windows SAPI＋字幕
 python -m earside listen --seconds 5 --no-asr      # 只測 VAD 切句
 python -m earside listen --file speech.wav         # 離線切句＋ASR
 python -m earside watch --preset presets/demo-color.json --seconds 5
+python -m earside calibrate --preset presets/demo-color.json
+```
+
+短句庫：
+
+```powershell
+python tools/lines_build.py --preset presets/demo-color --dry-run
 ```
 
 `talk`／`chat` 需要 LLM／TTS／ASR 端口；`talk` 不支援 builtin SAPI（pyttsx3 與串流執行緒會卡死）。
@@ -55,6 +64,7 @@ python -m earside watch --preset presets/demo-color.json --seconds 5
 複製 `config.example.toml` 成 `config.toml`。`doctor` 會印出目前生效的關鍵參數。
 `[tuning]` 的每個值、單位、改了會怎樣，都在 [docs/TUNING.md](docs/TUNING.md)。
 每段做了什麼、怎麼驗、踩過哪些坑，在 [docs/HANDOFF.md](docs/HANDOFF.md)。
+打包（PyInstaller／CI）在 [docs/PACKAGING.md](docs/PACKAGING.md)。
 
 ## 測試
 

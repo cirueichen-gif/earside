@@ -329,7 +329,7 @@ def cmd_chat(args: argparse.Namespace) -> int:
     from .core.paths import project_root
     from .ears.listener import Listener
     from .mouth.player import PlaybackBridge
-    from .ports.factory import make_asr, make_llm, make_tts, make_voice
+    from .ports.factory import make_asr, make_llm, make_tts, make_vision, make_voice
 
     cfg = load_config(args.config)
     tuning = cfg["tuning"]
@@ -370,6 +370,73 @@ def cmd_chat(args: argparse.Namespace) -> int:
         device=args.device or cfg.get("audio", {}).get("input_device") or None,
         tuning=tuning,
     )
+    sentinel_capture = None
+    sentinel_runner = None
+    triggers = None
+    linebank = None
+    if cfg.get("sentinel", {}).get("enabled", True):
+        try:
+            from .brain.triggers import TriggerEngine
+            from .eyes.capture import CaptureSession
+            from .eyes.preset import load_preset
+            from .eyes.rules import RuleEngine
+            from .eyes.sentinel import SentinelRunner
+
+            preset_path = Path(cfg["app"]["preset"])
+            if not preset_path.is_absolute():
+                preset_path = project_root() / preset_path
+            if preset_path.is_file():
+                preset = load_preset(preset_path)
+                regex = preset.match.get("window_title_regex")
+                if preset.enabled and regex:
+                    sentinel_capture = CaptureSession(
+                        regex,
+                        backend=str(cfg.get("capture", {}).get("backend", "auto")),
+                    )
+                    sentinel_runner = SentinelRunner(
+                        preset,
+                        sentinel_capture,
+                        RuleEngine(
+                            preset,
+                            sensitivity=float(
+                                cfg["sentinel"].get("sensitivity", 1.0)
+                            ),
+                        ),
+                    )
+                    triggers = TriggerEngine(preset.triggers)
+                    try:
+                        from .brain.linebank import LineBank
+                        from .core.paths import cache_dir
+
+                        lines_dir = preset_path.parent / "lines"
+                        if lines_dir.is_dir():
+                            linebank = LineBank(lines_dir.parent, cache_dir() / "lines")
+                    except Exception as exc:  # noqa: BLE001
+                        print(f"[linebank] 關閉：{exc}", file=sys.stderr)
+        except Exception as exc:  # noqa: BLE001 - 哨兵起不來不該阻止對話
+            print(f"[sentinel] 關閉：{exc}", file=sys.stderr)
+            sentinel_capture = None
+            sentinel_runner = None
+            triggers = None
+
+    eye = None
+    vision_cfg = cfg["ports"].get("vision", {})
+    if vision_cfg.get("enabled"):
+        try:
+            from .eyes.vision import Eye, VisionBudget
+
+            client = make_vision(vision_cfg)
+            if client is not None:
+                eye = Eye(
+                    client,
+                    VisionBudget(
+                        max_per_minute=int(vision_cfg.get("max_per_minute", 4)),
+                        max_per_hour=int(vision_cfg.get("max_per_hour", 60)),
+                    ),
+                )
+        except Exception as exc:  # noqa: BLE001
+            print(f"[eye] 關閉：{exc}", file=sys.stderr)
+
     live = LiveLoop(
         conv,
         listener,
@@ -377,6 +444,13 @@ def cmd_chat(args: argparse.Namespace) -> int:
         echo_guard_s=float(cfg["behavior"].get("echo_guard_s", 0.4)),
         merge_window_s=float(tuning.get("merge_window_s", 0.45)),
         fillers=set(str(tuning.get("fillers", ""))),
+        sentinel=sentinel_runner,
+        triggers=triggers,
+        silence_s=float(cfg["behavior"].get("silence_s", 240)),
+        max_proactive_per_hour=int(cfg["behavior"].get("max_proactive_per_hour", 3)),
+        combat_exit_s=float(cfg["behavior"].get("combat_exit_s", 45)),
+        eye=eye,
+        linebank=linebank,
     )
     try:
         asyncio.run(live.run(seconds=args.seconds or None))
@@ -386,9 +460,12 @@ def cmd_chat(args: argparse.Namespace) -> int:
         print(f"chat 失敗：{exc}", file=sys.stderr)
         return 1
     finally:
+        live.stop_sentinel()
         listener.stop()
         conv.close()
         player.close()
+        if sentinel_capture is not None:
+            sentinel_capture.close()
         if overlay:
             overlay.close()
     return 0
@@ -475,6 +552,13 @@ def cmd_watch(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_calibrate(args: argparse.Namespace) -> int:
+    from .eyes.calibrate import run_editor
+
+    run_editor(args.preset)
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="earside", description="耳邊：陪玩引擎")
     parser.add_argument("--config", default=None, help="config.toml 路徑")
@@ -523,6 +607,10 @@ def build_parser() -> argparse.ArgumentParser:
     watch.add_argument("--save", default=None, help="把每個區域第一幀存成 png")
     watch.add_argument("--sensitivity", type=float, default=None, help="0.5–2.0；越高越敏感")
     watch.set_defaults(func=cmd_watch)
+
+    calibrate = sub.add_parser("calibrate", help="開區域校準精靈（Tk）")
+    calibrate.add_argument("--preset", default=None, help="要編輯的 preset 路徑")
+    calibrate.set_defaults(func=cmd_calibrate)
     return parser
 
 

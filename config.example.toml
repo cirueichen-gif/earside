@@ -71,8 +71,11 @@ model = "companion"
 [ports.vision]
 enabled = false
 protocol = "openai"
-base_url = ""
+base_url = "http://127.0.0.1:8805/v1"
+api_key = ""
 model = ""
+max_per_minute = 4
+max_per_hour = 60
 
 [behavior]
 silence_s = 240

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import json
+import threading
 import urllib.request
 import uuid
 from typing import Any, Iterator
@@ -128,6 +129,21 @@ class OpenAIClient:
         self.api_key = api_key
         self.model = model
         self.timeout = timeout
+        self._active = None
+        self._lock = threading.Lock()
+        self._cancel_requested = False
+
+    def cancel(self) -> None:
+        """關掉正在讀的 HTTP response；讓串流的 worker 執行緒立刻結束（不再燒 token）。"""
+        self._cancel_requested = True
+        with self._lock:
+            resp = self._active
+            self._active = None
+        if resp is not None:
+            try:
+                resp.close()
+            except Exception:  # noqa: BLE001
+                pass
 
     def _request(self, messages: list[dict], stream: bool) -> urllib.request.Request:
         payload = {
@@ -142,28 +158,43 @@ class OpenAIClient:
         return urllib.request.Request(self.url, data=body, headers=headers)
 
     def stream(self, messages: list[dict]) -> Iterator[str]:
+        resp = None
+        self._cancel_requested = False
         try:
-            with urllib.request.urlopen(
+            resp = urllib.request.urlopen(
                 self._request(messages, stream=True), timeout=self.timeout
-            ) as resp:
-                for raw in resp:
-                    line = raw.decode("utf-8", "replace").strip()
-                    if not line.startswith("data:"):
-                        continue
-                    chunk = line[5:].strip()
-                    if chunk == "[DONE]":
-                        break
-                    try:
-                        obj = json.loads(chunk)
-                    except json.JSONDecodeError:
-                        continue
-                    for choice in obj.get("choices", []):
-                        delta = choice.get("delta") or {}
-                        content = delta.get("content")
-                        if content:
-                            yield content
+            )
+            with self._lock:
+                self._active = resp
+            for raw in resp:
+                line = raw.decode("utf-8", "replace").strip()
+                if not line.startswith("data:"):
+                    continue
+                chunk = line[5:].strip()
+                if chunk == "[DONE]":
+                    break
+                try:
+                    obj = json.loads(chunk)
+                except json.JSONDecodeError:
+                    continue
+                for choice in obj.get("choices", []):
+                    delta = choice.get("delta") or {}
+                    content = delta.get("content")
+                    if content:
+                        yield content
         except Exception as exc:  # noqa: BLE001
+            if self._cancel_requested:
+                return  # 是我們自己關掉的，不是錯誤
             raise PortError(f"{self.url}: {exc}") from exc
+        finally:
+            with self._lock:
+                if self._active is resp:
+                    self._active = None
+            if resp is not None:
+                try:
+                    resp.close()
+                except Exception:  # noqa: BLE001
+                    pass
 
     def describe(self, image: bytes, prompt: str) -> str:
         # TODO(P3)：第三部分才接；現在沒有呼叫端。

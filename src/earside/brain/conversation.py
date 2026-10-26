@@ -75,8 +75,14 @@ class Conversation:
         return messages
 
     def cancel(self) -> None:
-        """打斷：停止播放、丟掉這一輪剩下的句子。"""
+        """打斷：關掉 LLM 串流、停止播放、丟掉這一輪剩下的句子。"""
         self._cancelled = True
+        cancel_fn = getattr(self.llm, "cancel", None)
+        if callable(cancel_fn):
+            try:
+                cancel_fn()
+            except Exception:  # noqa: BLE001
+                pass
         try:
             self.player.stop()
         except Exception:  # noqa: BLE001
@@ -118,6 +124,20 @@ class Conversation:
             if not self._cancelled:
                 self.overlay.hide()
 
+    async def play_wav(self, text: str, wav: bytes) -> None:
+        """播一段預錄台詞（短句庫）；不重新合成。"""
+        if self._cancelled:
+            return
+        clean = speakable(text) or str(text)
+        if self.overlay is not None:
+            self.overlay.show(clean)
+        await self.player.play_async(wav)
+        self.last_play_end = time.monotonic()
+        if self.overlay is not None:
+            await asyncio.sleep(1.0)
+            if not self._cancelled:
+                self.overlay.hide()
+
     async def reply(self, text: str) -> None:
         self._cancelled = False
         self.stats["first_token_ms"] = None
@@ -128,7 +148,11 @@ class Conversation:
         spoken: list[str] = []
 
         while not self._cancelled:
-            kind, value = await queue.get()
+            try:
+                # 被打斷時不要卡在 queue.get()；0.1 秒就回頭看 _cancelled。
+                kind, value = await asyncio.wait_for(queue.get(), 0.1)
+            except asyncio.TimeoutError:
+                continue
             if kind == "end":
                 break
             if kind == "err":

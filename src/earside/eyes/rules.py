@@ -39,8 +39,9 @@ class RegionState:
         max_samples = max(int(15000 / interval), 100)
         self.history: deque[Tuple[float, float, float]] = deque(maxlen=max_samples)
 
-        # Recent raw metrics for 5-frame median temporal smoothing
-        self.recent_metrics: deque[Dict[str, float]] = deque(maxlen=5)
+        # Recent raw metrics for temporal smoothing; preset 可用 median_frames 調快慢
+        median_frames = max(1, int(region.rule.get("median_frames", 5)))
+        self.recent_metrics: deque[Dict[str, float]] = deque(maxlen=median_frames)
 
         # Previous frame for 'change' detector (grayscale, small size)
         self.prev_frame_gray: Optional[np.ndarray] = None

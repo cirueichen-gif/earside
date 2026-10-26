@@ -1,0 +1,11 @@
+{
+  "id": "general",
+  "name": "通用模板（先跑 earside calibrate）",
+  "game_type": "generic",
+  "enabled": false,
+  "sensitivity": 1.0,
+  "match": { "window_title_regex": "(?!)" },
+  "reference_aspect": 1.7778,
+  "regions": [],
+  "triggers": []
+}

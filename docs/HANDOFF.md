@@ -6,8 +6,11 @@
 ## 目前狀態
 
 - 2026-10-26：P1a–P1d、P2 的讀（擷取／preset／規則／watch）、sentinel 開關與靈敏度完成。
-- 41 個測試（4 個 capture 預設 skip）；public repo：https://github.com/cirueichen-gif/earside
-- 下一段：P3 眼睛（vision）、校準精靈、LLM 串流真取消。
+- 2026-10-27：P2 收尾（哨兵 runner、觸發器、校準 CLI）、P3（合圖／預算／Eye、主動／戰鬥、vision 接事件、短句庫）、P4 打包腳本與 CI。
+- **MVP 完成、可交接**：73 個測試（4 個 capture 預設 skip）。
+- 未完成（不是架構問題，是環境／需求）：真實 vision 端口沒實跑（要金鑰）、exe 沒實建（本機 SAC）、校準 UI 只做過開啟/關閉 smoke。
+- **GitHub 未推**（魚片交代等他叫）；本機變更已 commit 在 main。
+- 下一段：拿真遊戲 preset 校準、接 vision 端口、找沒 SAC 的機器建 exe。
 
 > 註：第一次公開上傳時把早期 commit 壓成一個 Initial，所以 P1a–P2 在 git 歷史裡看不出分段。之後每小塊一個 commit。
 
@@ -157,6 +160,125 @@
 
 ---
 
+## 校準精靈（2026-10-27）
+
+**做了什麼**
+- `eyes/calibrate.py`：`normalize_rect`（拖曳→0–1）、`build_preset`、`save_preset`、`run_editor`（Tk：抓視窗截圖、拖框、命名、選 rule、存 preset）。
+- `tests/test_calibrate.py`：純函式 round-trip；不在測試裡開視窗。
+
+**怎麼驗**
+- 全套 60 tests（含 calibrate）。
+- UI 尚未由魚片手動跑過（agent 只驗了 import 與純函式）。
+
+**已知缺口**
+- 還沒接 `earside calibrate` CLI 子命令。
+- UI 手動 smoke（Notepad 框選→存檔→load_preset）待做。
+
+**踩過的坑**
+- 交來時 `build_preset` 少一個括號（SyntaxError），已修。
+
+**下一步**：接 CLI、實際框一次存檔。
+
+---
+
+## P3 視覺（起頭，2026-10-27）
+
+**做了什麼**
+- `eyes/vision.py`：`compose_frame`（主畫面＋ROI 標籤合成 JPEG）、`VisionBudget`（每分／每小時）、`Eye`（預算＋client＋`last_error`）。
+
+**怎麼驗**
+- 合成圖／預算／假 client 測試；6 個瘦高 ROI 的下方版面回歸測試。
+- 全套 60 tests。
+
+**已知缺口**
+- 還沒接 CLI／config／trigger；真正的 vision 端口未接。
+- `Eye.describe()` 是同步，接事件迴圈要丟 thread。
+
+**下一步**：接到 `watch`／`chat` 的事件，config `ports.vision` 生效。
+
+**後續（同日）**
+- 已接：`chat` 在 trigger 帶 `vision: true` 時，用 `SentinelRunner.last_frame` ＋ `Eye` 描述，併進 LLM prompt；`ports.vision` 的 enabled／預算接進 config。
+- 驗證：假 Eye 回「你在倉庫補彈」，prompt 有那句話；68 tests。
+- 還沒：真的 vision 端口（要金鑰）沒實跑；`Eye.describe` 用 `to_thread` 丟出去了。
+
+---
+
+## P2 收尾：哨兵 runner＋觸發器（2026-10-27）
+
+**做了什麼**
+- `eyes/sentinel.py`：`SentinelRunner.poll()`（一輪共用一次 grab、只回狀態變化）＋ `run()` 背景迴圈。
+- `brain/triggers.py`：事件→動作，支援冷卻、`max_per_min`、`max_per_hour`、`skip_if_speaking`。
+- `chat`：哨兵在背景執行緒跑；事件→觸發器→`llm` 動作會主動回一句（`linebank` 目前只印訊息，等 runtime）。
+- `earside calibrate` 子命令接上校準精靈。
+
+**怎麼驗**
+- `SentinelRunner` 假擷取＋`RuleEngine`：第一幀不發、變了才 on、再變回 off。
+- `TriggerEngine`：冷卻、每分上限、每小時上限（3700 秒後恢復）、說話中跳過。
+- 全套 65 tests。
+
+**已知缺口**
+- 短句庫 runtime 還沒接（`linebank` 動作只印 log）。
+- vision 還沒接事件；沉默／戰鬥模式還沒做。
+
+**踩過的坑**
+- `max_per_hour` 一開始只留 60 秒 deque，等於被靜默忽略；已補 `_hour_calls`。
+
+**下一步**：短句庫 runtime、vision 動作、沉默／戰鬥。
+
+---
+
+## P3 主動與戰鬥（2026-10-27）
+
+**做了什麼**
+- `brain/live.py`：沉默 `silence_s`（預設 240s）→ 主動找話，每小時上限；畫面大變（`diff_ratio ≥ 0.25`）進戰鬥模式 45 秒，戰鬥中不主動、哨兵也不主動講。
+- `chat` 把 `behavior.silence_s`／`max_proactive_per_hour`／`combat_exit_s` 接進來。
+
+**怎麼驗**
+- 假 conversation：沉默 241s 觸發一次、第二次被 rate limit 擋；戰鬥中 `_maybe_proactive` 不呼叫。
+- 全套 67 tests。
+
+**已知缺口**
+- 主動台詞還是走 LLM；等短句庫 runtime 後，戰鬥中要能只播預錄。
+- 「戰鬥模式」目前只看哨兵 `change` 的 `diff_ratio`，沒有真的看主畫面；RTS 這類小變化可能不會進戰鬥。
+
+**下一步**：短句庫、用主畫面變化判斷戰鬥。
+
+---
+
+## 短句庫（2026-10-27）
+
+**做了什麼**
+- `tools/lines_build.py`：`presets/<dir>/lines/*.txt` → 每句呼叫 TTS → `cache/lines/<hash>.wav`＋`manifest.json`；失敗繼續、第二次跳過已完成。
+- `brain/linebank.py`：runtime 讀 manifest（沒有就掃 hash 檔）、`pick(bank)` 輪替。
+- `chat`：trigger `source=linebank` 時直接播預錄 wav＋字幕，不合成、不燒 token。
+
+**怎麼驗**
+- 4 個短句庫測試（key 穩定、註解跳過、partial success、runtime 輪替）；73 tests。
+
+**已知缺口**
+- 只支援 `presets/<dir>/lines/` 這個目錄結構；沒有 UI。
+- 還沒用真 TTS 建一整包（測試用 fake）。
+
+**下一步**：拿真 TTS 建一次 death／minimap 短句。
+
+---
+
+## P4 打包（2026-10-27）
+
+**做了什麼**
+- `earside.spec`（PyInstaller onedir）、`scripts/build.ps1`、`.github/workflows/ci.yml`、`docs/PACKAGING.md`。
+
+**怎麼驗**
+- spec 語法檢查、CI YAML 檢查；**exe 沒在本機實建**（Smart App Control 會擋未簽章 exe）。
+
+**已知缺口**
+- 沒跑 `pyinstaller` 實際打包；CI 也沒在 GitHub 上跑過（今晚不推）。
+- 模型（ASR／RVC）不進 exe，文件已寫。
+
+**下一步**：找一臺沒 SAC 的機器或 CI artifact 實建。
+
+---
+
 ## 坑表（最值錢）
 
 已修：
@@ -172,15 +294,21 @@
 | 7 | WGC 未實作但 auto 會選它 | auto 一律 mss |
 | 8 | 單幀 VAD 就打斷 | `vad_onset_frames=8`（250ms） |
 | 9 | echo guard 用文字到達時間會誤殺 | 改用 `utt.wall_start` |
+| 10 | LLM 打斷後 worker 卡在讀取 | cancel 關 response＋`reply` 用 `wait_for(0.1)` 交還控制；worker 可能晚一個 chunk 才結束（有限） |
+| 11 | vision 下方版面越界 | `combined_w` 補 8px 間距＋回歸測試 |
+| 12 | vision 大圖可能 >5MB | `compose_frame` 加上限，超過就縮圖／降品質重編 |
+| 13 | 短句庫每小時上限被忽略 | `TriggerEngine` 補 `_hour_calls` |
+| 14 | `linebank` 只有 log、沒真的播 | 接 `brain/linebank.py`＋`Conversation.play_wav` |
 
 還沒修：
 
 | # | 坑 | 影響 |
 |---|---|---|
-| 10 | 死亡判定約 1.0 秒 | 面板上「怎麼這麼慢」 |
-| 11 | LLM 串流打斷沒真取消 | token 照燒 |
-| 12 | mss 抓不到被遮擋視窗 | 字幕／其他視窗會入鏡 |
-| — | 校準精靈未做 | 玩家得手改 JSON |
+| 15 | 死亡判定約 1.0 秒 | 面板上「怎麼這麼慢」 |
+| 16 | mss 抓不到被遮擋視窗 | 字幕／其他視窗會入鏡 |
+| 17 | vision 端口沒實跑 | 只有假 client 測試 |
+| 18 | 校準 UI 未手動驗 | 玩家可能卡在介面 |
+| 19 | exe 未實建 | P4 只到腳本層 |
 
 ---
 

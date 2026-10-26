@@ -58,7 +58,15 @@ DEFAULTS: dict[str, Any] = {
             "api_key": "",
             "model": "companion",
         },
-        "vision": {"enabled": False, "protocol": "openai", "base_url": "", "model": ""},
+        "vision": {
+            "enabled": False,
+            "protocol": "openai",
+            "base_url": "",
+            "api_key": "",
+            "model": "",
+            "max_per_minute": 4,
+            "max_per_hour": 60,
+        },
     },
     "behavior": {
         "silence_s": 240,

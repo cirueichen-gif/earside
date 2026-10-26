@@ -45,6 +45,8 @@
 preset 也可以有自己的 `enabled`、`sensitivity`、`game_type`；單一區域的 `rule.sensitivity` 再覆蓋一次。
 **RTS 這類 UI 動畫多的遊戲，建議 0.5–0.8**；FPS 可以 1.0 上下。先跑 `watch` 乾跑看事件量再調。
 
+死亡判定的延遲也可以調：region 的 `rule.median_frames`（預設 5，越小越快但越容易被閃光騙）＋`consecutive`（預設 3）。200ms 間隔下，5＋3 大約 1.0 秒；改 3＋2 約 0.6 秒。
+
 ## 已知的坑
 
 - **SAPI 不能用在 talk／chat**：pyttsx3 的訊息幫浦跟串流執行緒會卡死；`builtin` 只留給 `say`。

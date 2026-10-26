@@ -1,5 +1,6 @@
 __pycache__/
 *.py[cod]
+*.egg-info/
 .venv/
 local/
 config.toml
@@ -10,3 +11,4 @@ cache/
 .mypy_cache/
 build/
 dist/
+uv.lock
