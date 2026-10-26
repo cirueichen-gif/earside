@@ -54,6 +54,7 @@ python -m earside watch --preset presets/demo-color.json --seconds 5
 
 複製 `config.example.toml` 成 `config.toml`。`doctor` 會印出目前生效的關鍵參數。
 `[tuning]` 的每個值、單位、改了會怎樣，都在 [docs/TUNING.md](docs/TUNING.md)。
+每段做了什麼、怎麼驗、踩過哪些坑，在 [docs/HANDOFF.md](docs/HANDOFF.md)。
 
 ## 測試
 
