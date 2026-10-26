@@ -1,0 +1,84 @@
+# earside 設定範例。複製成 config.toml 再改。
+# 路徑都相對於專案根（earside/）。
+
+[app]
+language = "zh-TW"
+persona = "personas/companion_zh.md"
+preset = "presets/general.json"
+
+[capture]
+backend = "auto"          # auto = mss（WGC 還沒實作）
+
+[tuning]
+# 起句門檻（0–1）。太高→小聲漏掉；太低→雜音當人聲。
+vad_threshold = 0.5
+# 開頭緩衝（秒）；覺得第一個字不見就加大。
+vad_pre_roll_s = 0.30
+# 連續幾幀人聲才 confirmed（一幀 32ms）。8＝250ms；常被雜音打斷就加大。
+vad_onset_frames = 8
+# 靜音多久算講完（秒）。0.7 會把「我問說」「我起」切成兩半（07 實測）。
+vad_hangover_s = 1.00
+# 太短丟掉（咳嗽、雜音）。
+vad_min_speech_s = 0.25
+# 單句硬切上限（秒）。
+vad_max_utter_s = 15.0
+# ASR 端口逾時（秒）；冷啟動載模型約 13 秒。
+asr_timeout_s = 30.0
+# 嘴巴：短句合併窗；越小接話越快、越大越不容易搶話。
+merge_window_s = 0.45
+# 哪些純語氣詞不送進 LLM。
+fillers = "嗯恩啊喔哦欸呃唉齁嘿ㄟ"
+# 一句最多幾個字（硬切）／多長開始用逗號切。
+sentence_max_len = 42
+sentence_soft_len = 24
+# SAPI 語速（只有 builtin 用）。
+sapi_rate = 175
+# 播放取樣率；裝置不支援 48k 就改 44100。
+playback_samplerate = 48000
+# 記得幾輪對話。
+max_turns = 10
+# 字幕每行幾個字。
+overlay_chars_per_line = 30
+
+[audio]
+# 空白＝系統預設輸入；也可以填裝置名稱片段，例如 "Mic Array"。
+# 注意：Windows 預設輸入常常是 Stereo Mix，會把系統聲音聽成你講話。
+input_device = ""
+
+[ports.asr]
+kind = "http"
+url = "http://127.0.0.1:8802/stt"
+
+[ports.tts]
+# http：edge-tts 轉接器（建議，talk 用這個）
+# builtin：Windows SAPI，只建議給 `say`；跟串流一起跑會卡（pyttsx3 的已知毛病）
+kind = "http"
+url = "http://127.0.0.1:8803/tts"
+
+[ports.llm]
+kind = "http"
+protocol = "openai"
+base_url = "http://127.0.0.1:8801/v1"
+api_key = ""
+model = "companion"
+
+[ports.vision]
+enabled = false
+protocol = "openai"
+base_url = ""
+model = ""
+
+[behavior]
+silence_s = 240
+max_proactive_per_hour = 3
+barge_in = true
+# 喇叭模式設 false；echo_guard_s 是她講完後多留的尾巴（秒）
+echo_guard_s = 0.4
+combat_exit_s = 45
+
+[subtitle]
+font = "Microsoft JhengHei"
+size = 30
+alpha = 0.82
+position = "bottom-center"
+max_lines = 2

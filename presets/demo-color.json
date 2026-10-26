@@ -1,0 +1,15 @@
+{
+  "id": "demo-color",
+  "name": "換色視窗測試",
+  "match": { "window_title_regex": "earside-capture-test" },
+  "reference_aspect": 1.333,
+  "regions": [
+    {
+      "name": "whole",
+      "rect": [0.0, 0.0, 1.0, 1.0],
+      "interval_ms": 300,
+      "rule": { "type": "change", "diff_ratio": 0.1, "consecutive": 1 }
+    }
+  ],
+  "triggers": []
+}

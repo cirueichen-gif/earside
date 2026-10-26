@@ -1,0 +1,28 @@
+[project]
+name = "earside"
+version = "0.1.0"
+description = "開源陪玩引擎：聽、說、讀、寫，全部端口化。"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+core = [
+  "numpy",
+  "soundfile",
+  "sounddevice",
+  "pyttsx3",
+  "soxr",
+  "opencv-python-headless",
+  "mss",
+  "onnxruntime",
+  "silero-vad",
+  "pillow",
+  "pystray",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
